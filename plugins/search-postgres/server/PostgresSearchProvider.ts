@@ -779,13 +779,12 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
       }
 
       if (limitedQuery || iLikeQueries.length === 0) {
-        where[Op.and].push(
-          Sequelize.fn(
-            `"searchVector" @@ to_tsquery`,
-            "english",
-            Sequelize.literal(":query")
-          )
-        );
+        const keywords = `${"'" + options.query + "'"}`;
+        const whereClause = `
+        (text &@~ ${keywords} OR title &@~ ${keywords})
+        `;
+
+        where[Op.and].push(Sequelize.literal(whereClause));
       }
     }
 
