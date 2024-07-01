@@ -1,6 +1,5 @@
 ARG APP_PATH=/opt/outline
-ARG BASE_IMAGE=outlinewiki/outline-base
-FROM ${BASE_IMAGE} AS base
+FROM eeemt/outline-base as base
 
 ARG APP_PATH
 WORKDIR $APP_PATH
