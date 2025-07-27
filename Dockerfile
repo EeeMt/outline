@@ -1,5 +1,5 @@
 ARG APP_PATH=/opt/outline
-FROM eeemt/outline-base as base
+FROM eeemt/outline-base AS base
 
 ARG APP_PATH
 WORKDIR $APP_PATH
