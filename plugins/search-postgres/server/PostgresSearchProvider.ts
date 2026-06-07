@@ -777,13 +777,11 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
       }
 
       if (limitedQuery || iLikeQueries.length === 0) {
-        where[Op.and].push(
-          Sequelize.fn(
-            `"searchVector" @@ to_tsquery`,
-            "english",
-            Sequelize.literal(":query")
-          )
-        );
+        const escapedQuery = options.query.replace(/'/g, "''");
+        const keywords = `'${escapedQuery}'::text`;
+        const whereClause = `("text" &@~ ${keywords} OR title &@~ ${keywords})`;
+
+        where[Op.and].push(Sequelize.literal(whereClause));
       }
     }
 
