@@ -100,6 +100,13 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
   );
 
   /**
+   * Cached regex pattern for Chinese, Japanese, and Korean characters, which
+   * the english full-text parser has no word boundaries to split on.
+   */
+  private static readonly CJK_REGEX =
+    /[\u1100-\u11ff\u2e80-\u2fdf\u3040-\u30ff\u3130-\u318f\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff66-\uff9f\u{20000}-\u{2fa1f}]/u;
+
+  /**
    * Cached stop words set for efficient lookup.
    * Based on: https://github.com/postgres/postgres/blob/fc0d0ce978752493868496be6558fa17b7c4c3cf/src/backend/snowball/stopwords/english.stop
    */
@@ -878,12 +885,18 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
    * Builds the full-text condition for the unquoted part of a query. Terms
    * that look like identifiers, such as "config.ws_value", also match as
    * literal text, as the postgres parser does not always split them into the
-   * same lexemes in a document as in a query.
+   * same lexemes in a document as in a query. Queries containing CJK
+   * characters are matched as bigrams instead, as the english parser cannot
+   * split text without word boundaries.
    *
    * @param query the unquoted part of the user search query.
    * @returns the where condition.
    */
   private static buildTextMatch(query: string): WhereOptions<Document> {
+    if (PostgresSearchProvider.CJK_REGEX.test(query)) {
+      return PostgresSearchProvider.buildBigramMatch(query);
+    }
+
     const fullTextMatch = Sequelize.fn(
       `"searchVector" @@ to_tsquery`,
       "english",
@@ -922,6 +935,22 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
     }
 
     return { [Op.or]: [fullTextMatch, { [Op.and]: conditions }] };
+  }
+
+  /**
+   * Builds a condition that matches documents whose title or text contains
+   * the query as literal bigrams, using the pg_bigm extension. The english
+   * full-text parser does not split CJK text into words, so to_tsquery cannot
+   * match queries in those languages.
+   *
+   * @param query the unquoted part of the user search query.
+   * @returns the where condition.
+   */
+  private static buildBigramMatch(query: string): WhereOptions<Document> {
+    const pattern = sequelizeReadOnly.escape(query);
+    return Sequelize.literal(
+      `("text" &@~ ${pattern}::text OR title &@~ ${pattern}::text)`
+    );
   }
 
   /**
