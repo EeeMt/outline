@@ -886,15 +886,15 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
    * that look like identifiers, such as "config.ws_value", also match as
    * literal text, as the postgres parser does not always split them into the
    * same lexemes in a document as in a query. Queries containing CJK
-   * characters are matched as bigrams instead, as the english parser cannot
-   * split text without word boundaries.
+   * characters are matched with PGroonga instead, as the english parser
+   * cannot split text without word boundaries.
    *
    * @param query the unquoted part of the user search query.
    * @returns the where condition.
    */
   private static buildTextMatch(query: string): WhereOptions<Document> {
     if (PostgresSearchProvider.CJK_REGEX.test(query)) {
-      return PostgresSearchProvider.buildBigramMatch(query);
+      return PostgresSearchProvider.buildGroongaMatch(query);
     }
 
     const fullTextMatch = Sequelize.fn(
@@ -938,15 +938,15 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
   }
 
   /**
-   * Builds a condition that matches documents whose title or text contains
-   * the query as literal bigrams, using the pg_bigm extension. The english
-   * full-text parser does not split CJK text into words, so to_tsquery cannot
-   * match queries in those languages.
+   * Builds a condition that matches documents whose title or text match the
+   * query, using the PGroonga extension. The english full-text parser does not
+   * split CJK text into words, so to_tsquery cannot match queries in those
+   * languages.
    *
    * @param query the unquoted part of the user search query.
    * @returns the where condition.
    */
-  private static buildBigramMatch(query: string): WhereOptions<Document> {
+  private static buildGroongaMatch(query: string): WhereOptions<Document> {
     const pattern = sequelizeReadOnly.escape(query);
     return Sequelize.literal(
       `("text" &@~ ${pattern}::text OR title &@~ ${pattern}::text)`
